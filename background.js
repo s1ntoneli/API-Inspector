@@ -1,15 +1,24 @@
-var urls = new Map();
-var requestUrls = [];
+var apiUrlMap = new Map();
+var requestUrlsMap = new Map();
 
 chrome.webRequest.onCompleted.addListener(function(details) {
     var url = details.url;
+    var tabId = details.tabId;
+
+    console.log(url);
+    if (tabId < 0) return;
+
+    var currentTabList = requestUrlsMap.has(tabId) ? requestUrlsMap.get(tabId) : [];
+    if (contains(requestUrlsMap, url)) return;
+
+    currentTabList.push(url);
+    requestUrlsMap.set(tabId, currentTabList);
+
     console.log("url: " + url);
+
     var xhr = new XMLHttpRequest();
     xhr.open("GET", url, true);
 
-    if (contains(requestUrls, url)) return;
-
-    requestUrls.push(url);
     xhr.onreadystatechange = function() {
         if (xhr.readyState === 4) {
             // console.log("xhr result: " + xhr.responseText);
@@ -17,12 +26,15 @@ chrome.webRequest.onCompleted.addListener(function(details) {
                 console.log("is Json");
                 var urlObj = parseURL(url);
                 var key = urlObj.host + urlObj.path;
-                if (!urls.has(key)) {
-                    // urls.push(urlObj);
-                    urls.set(key, urlObj);
-                    console.warn("add " + url);
 
-                    notifyPopup(urls);
+                var currentTabUrlMap = apiUrlMap.has(tabId) ? apiUrlMap.get(tabId) : new Map();
+                if (!currentTabUrlMap.has(key)) {
+                    // apiUrlMap.push(urlObj);
+                    currentTabUrlMap.set(key, urlObj);
+                    console.warn("add " + key);
+
+                    apiUrlMap.set(tabId, currentTabUrlMap);
+                    notifyPopup(currentTabUrlMap);
                 }
             } else {
                 console.log("not Json");
@@ -36,6 +48,41 @@ chrome.webRequest.onCompleted.addListener(function(details) {
     types: ["xmlhttprequest", "script"]
 }
 //["responseHeaders"]
+);
+
+chrome.tabs.onRemoved.addListener(
+    function (tabId, removedInfo) {
+        // clear tabId from map
+        // clear badge
+        console.log("removed " + tabId);
+        apiUrlMap.delete(tabId);
+        requestUrlsMap.delete(tabId);
+    }
+);
+
+chrome.tabs.onUpdated.addListener(
+    function (tabId, changeInfo, tab) {
+        console.log("updated " + tabId);
+    }
+);
+
+chrome.tabs.onActiveChanged.addListener(
+    function (tabId, selectInfo) {
+        console.log("activeChanged " + tabId);
+        notifyPopup(apiUrlMap.get(tabId));
+    }
+);
+
+chrome.windows.onFocusChanged.addListener(
+    function (windowId) {
+
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+            if (tabs && tabs.length > 0) {
+                var tab = tabs[0];
+                notifyPopup(apiUrlMap.get(tab.id));
+            }
+        });
+    }
 );
 
 function isJson(sData) {
@@ -97,8 +144,27 @@ function parseURL(url) {
 
 function notifyPopup(urls) {
     if (!urls || urls.size === 0) {
-        chrome.browserAction.setBadgeText({text: ""});
+        clearBadge()
     } else {
-        chrome.browserAction.setBadgeText({text: urls.size + ""});
+        setBadgeText(urls.size + "");
     }
+}
+
+function clearBadge() {
+    setBadgeText("")
+}
+
+function setBadgeText(text) {
+    chrome.browserAction.setBadgeText({text: text});
+}
+
+var getCurrentTabUrlMap = function (callback) {
+    console.log("getCurrentTabUrlMap");
+    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+        console.log(tabs);
+        if (tabs && tabs.length > 0) {
+            var tab = tabs[0];
+            callback(apiUrlMap.get(tab.id));
+        }
+    });
 }

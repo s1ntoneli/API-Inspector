@@ -11,8 +11,8 @@
   },
   "permissions": [
     "webRequest",
-    "webRequestBlocking",
-    "*://*.baidu.com/*"
+    "*://*/*",
+    "tabs"
   ],
   "background": {
     "scripts": [

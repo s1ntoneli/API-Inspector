@@ -105,13 +105,16 @@ function saveBackgroundColor(url, color) {
 // user devices.
 document.addEventListener('DOMContentLoaded', () => {
     var apilist = document.getElementById("list");
-    chrome.extension.getBackgroundPage().urls.forEach((value, key) => {
-        var p = document.createElement('p');
-        var a = document.createElement('a');
-        a.innerText = key;
-        a.href = value.source;
-        a.target = "_blank";
-        p.append(a);
-        apilist.append(p);
+
+    chrome.extension.getBackgroundPage().getCurrentTabUrlMap(function (urlMap) {
+        urlMap.forEach((value, key) => {
+            var p = document.createElement('p');
+            var a = document.createElement('a');
+            a.innerText = key;
+            a.href = value.source;
+            a.target = "_blank";
+            p.append(a);
+            apilist.append(p);
+        });
     });
 });
